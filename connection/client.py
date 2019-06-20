@@ -46,6 +46,9 @@ class Client:
         thread_send = threading.Thread(target=self.chat)
         thread_send.start()
 
+        thread_send.join()
+        thread_receive.join()
+
     """
     Função definida para receber mensagens na porta definida em __init__ e responder caso seja necessário
     """
