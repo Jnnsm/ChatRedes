@@ -6,11 +6,11 @@ class Server:
     udp = None
     clients = {}
     def __init__(self, host='', port=2000):
-        udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         origem = (host, port)
-        udp.bind(origem)
+        self.udp.bind(origem)
 
-        self.list_udp()
+        self.listen_udp()
     
     def listen_udp(self):
         while True:
@@ -32,5 +32,4 @@ class Server:
     def send_msg(self, message, host, port=2000):
         udp_msg = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         destino = (host, port)
-        udp_msg.bind(destino)
-        udp_msg.sendto(message, udp_msg)
+        udp_msg.sendto(message, destino)
