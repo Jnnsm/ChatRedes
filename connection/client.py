@@ -68,7 +68,7 @@ class Client:
                         self.received_ack = True
                     # Caso recebemos um info mostramos o conteúdo da informação na tela
                     elif "INFO:" in message:
-                        print(message[5:])
+                        print(message[6:])
                     # Mostra a mensagem recebida pelo usuário
                     elif message.split(':')[0] == "MSG":
                         message = message.split(':')[1] + " disse: " + message.split(':')[2]
