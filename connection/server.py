@@ -2,83 +2,147 @@ import threading
 import socket
 import time
 
+import sys
+sys.path.insert(0,'/arquivos')
+
 
 class Server:
+    '''
+    Classe que cria e gerencia as conexões e todas as operações em modo servidor
+    '''
+
     udp = None
     tcp = None
     port = None
     clients = {}
-    keep_time = 0
-    def __init__(self, host='', port=20000):
+    def __init__(self, host='', port=20002):
         self.port = port
+
+        #Cria a conexão UDP
         self.udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        origem = (host, port)
-        self.udp.bind(origem)
+        origem_udp = (host, port)
+        self.udp.bind(origem_udp)
 
+        #Cria a conexão TCP
         self.tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        #self.bind(tcp.bind(orig))
+        origem_tcp = (host, port)
+        self.tcp.bind(origem_tcp)
+        self.tcp.listen(1)
 
-        self.keep_time = time.time()
+        #Thread criada para mandar a mensagem KEEP a cada 10 segundos
+        keep_thread = threading.Thread(target=self.keep_sender)
+        keep_thread.start()
 
         self.listen_udp()
     
     def listen_udp(self):
+        '''
+        Função definida para gerenciar todas as mensagem recebidas
+        '''
+
         while True:
             msg, cliente = self.udp.recvfrom(1024)
             
             msg_decode = msg.decode()
             print(cliente, msg.decode())
 
-            if(msg_decode == 'BYE'): #retira cliente da lista de conectados
+            if(msg_decode == 'BYE'): #Retira cliente da lista de conectados se receber BYE
                     print("Cliente {} desconectou".format(self.clients[cliente[0]][0]))
                     del self.clients[cliente[0]]
-            elif(msg_decode == 'LINK'):
+
+            elif(msg_decode == 'LINK'): #Envia a lista de clientes conectados se receber LINK
                 for k in self.clients:
-                    self.send_msg(self.clients[k][0], cliente[0])
-            elif( 'FILE' == msg_decode[0:4] ):
-                pass
-            elif(cliente[0] in self.clients):
-                self.broadcast_exc(msg_decode, cliente[0], self.port)
-            else:
+                    self.send_msg(self.clients[k][0], cliente[0], self.port)
+
+            elif(msg_decode == 'KEEP'): #Zera a penalidade do KEEP se o cliente responder
+                self.clients[cliente[0]][2] = 0
+
+            elif( 'FILE' == msg_decode[0:4] ): #Recebe um arquivo
+                print("trasferir aqruivo")
+                self.create_tcp_thread(msg_decode[4:])
+
+            elif('MSG' == msg_decode[0:3] and cliente[0] in self.clients): #Faz um broadcast da mesagem enviada
+                message_to_resend = "MSG:{}:{}".format(self.clients[cliente[0]][0],msg_decode)
+                self.broadcast(message_to_resend, cliente[0], port = self.port)
+
+            elif('USER' == msg_decode[0:4]): #Adiciona cliente na lista de clientes conectados
                 split_msg = msg_decode.split(':')
                 
-                #Adiciona na lista de clientes
                 if(split_msg[0] == "USER"):
                     print("user {} adicionado".format(split_msg[1]) )
-                    self.clients[cliente[0]] = (split_msg[1], cliente[1])
+                    self.clients[cliente[0]] = [split_msg[1], cliente[1], 0]
                     print (self.clients)
 
-                    self.send_msg("ACK", cliente[0]) #Envia ACK para o cliente conectado
+                    self.send_msg("ACK", cliente[0], self.port) #Envia ACK para o cliente conectado
 
-            #Envia KEEP a cada 10 segundos
-            if time.time() - self.keep_time > 10:
-                self.broadcast("KEEP")
         self.udp.close()
+
+    def create_tcp_conn(self, conn, cliente_tcp, file_name = ''):
+        '''
+        Função definida para aceitar a conexão e criar uma thread para a mesma
+        '''
+
+        print('Iniciando conexao TCP com o cliente', self.clients[cliente_tcp[0]])
+        buffer = None #buffer do arquivo
+        f = open("arquivos/{}".format(file_name),"w+")
+        while True:
+            arq = conn.recv(1024).decode()
+            buffer += arq
+        
+        f.write(buffer)
+            
+
+        print('Finalizando conexao TCP do cliente', self.clients[cliente_tcp[0]])
+        conn.close()
+        return
+
+    def create_tcp_thread(self, file_name = ''):
+        '''
+        Função definida para aceitar a conexão e criar uma thread para a mesma
+        '''
+
+        conn, cliente_tcp = self.tcp.accept()
+        tcp_thread = threading.Thread(target=self.create_tcp_conn, args=(conn, cliente_tcp, file_name))
+        tcp_thread.start()
+
     
+    def keep_sender(self):
+        '''
+        Função definida para enviar KEEP a cada 10 segundos
+        (Ser usada em uma thread) 
+        '''
+
+        keep_time = time.time()
+        while True:
+            if time.time() - keep_time > 10:
+                #Penaliza em um o cliente que não mandar o KEEP
+                for k in self.clients:
+                    if self.clients[k][2] == -3:
+                        print("Cliente {} desconectou por não reenviar o KEEP".format(self.clients[k][0]))
+                        del self.clients[k]
+                    else:
+                        self.clients[k][2] -= 1
+
+                self.broadcast("KEEP", port = self.port)
+                keep_time = time.time()
+                
+        
+
 
     def send_msg(self, message, host, port=20000):
-        '''Envia uma mensagem em forma de string'''
+        '''
+        Função atômica para enviar uma mensagem com o host, string e porta passadas como parâmetro
+        '''
         destino = (host, port)
         self.udp.sendto(message.encode(), destino)
 
-    def resend_msg(self, message, host, port=20000):
-        '''Envia uma mensagem em bytes mensagem em forma de string'''
-        destino = (host, port)
-        self.udp.sendto(message, destino)
-
-    def broadcast_exc(self, message, excluded_host, port=20000):
-        '''Envia mensagem para todos os usuários menos quem mandou a mensagem e coloca a identificação'''
-
-        #Junta mensagem com a identificação de quem mandou
-        new_message = "MSG:{}:{}".format(self.clients[excluded_host], message)
+    def broadcast(self, message, excluded_host = [], port=20000):
+        '''
+        Função definida para enviar mensagens para todos os usuários
+        exceto os da lista passados como parâmetro
+        '''
 
         for hosts in self.clients: #Envia a mensagem para os clientes cadastrados
-            if hosts != excluded_host:
-                self.send_msg(new_message, hosts, port)
-
-    def broadcast(self, message, port=20000):
-        '''Envia mensagem para todos os clientes cadastrados'''
-
-        for hosts in self.clients:
-            self.send_msg(message, hosts, port)
+            if hosts not in excluded_host:
+                self.send_msg(message, hosts, port)
             
