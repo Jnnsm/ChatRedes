@@ -9,8 +9,8 @@ from connection import server, client
 def main():
     parser = argparse.ArgumentParser(description='Main do programa para Cliente/Servidor da troca de mensagens')
     parser.add_argument('type', help='Tipo de execução de programa, C para cliente e S para servidor')
-    parser.add_argument('username', required=False, help='Username do cliente')
-    parser.add_argument('host', required=False, help='Endereco do servidor')
+    parser.add_argument('--username', required=False, help='Username do cliente')
+    parser.add_argument('--host', required=False, help='Endereco do servidor')
     args = parser.parse_args()
 
     conn = None
