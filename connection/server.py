@@ -15,7 +15,7 @@ class Server:
     tcp = None
     port = None
     clients = {}
-    def __init__(self, host='', port=20002):
+    def __init__(self, host='', port=20000):
         self.port = port
 
         #Cria a conexão UDP
@@ -58,10 +58,12 @@ class Server:
                 self.clients[cliente[0]][2] = 0
 
             elif( 'FILE' == msg_decode[0:4] ): #Recebe um arquivo
-                print("trasferir aqruivo")
-                self.create_tcp_thread(msg_decode[4:])
+                self.create_tcp_thread_receive(msg_decode[4:])
 
-            elif('MSG' == msg_decode[0:3] and cliente[0] in self.clients): #Faz um broadcast da mesagem enviada
+            elif( 'GET' == msg_decode[0:3] ): #Envia um arquivo
+                self.create_tcp_thread_send(msg_decode[3:], cliente[0], self.port)
+
+            elif('MSG' == msg_decode[0:3] and cliente[0] in self.clients): #Faz um broadcast da mensagem enviada
                 message_to_resend = "MSG:{}:{}".format(self.clients[cliente[0]][0],msg_decode)
                 self.broadcast(message_to_resend, cliente[0], port = self.port)
 
@@ -71,39 +73,69 @@ class Server:
                 if(split_msg[0] == "USER"):
                     print("user {} adicionado".format(split_msg[1]) )
                     self.clients[cliente[0]] = [split_msg[1], cliente[1], 0]
-                    print (self.clients)
 
                     self.send_msg("ACK", cliente[0], self.port) #Envia ACK para o cliente conectado
 
         self.udp.close()
 
-    def create_tcp_conn(self, conn, cliente_tcp, file_name = ''):
+    def create_tcp_conn_receive(self, conn, cliente_tcp, file_name = ''):
         '''
         Função definida para aceitar a conexão e criar uma thread para a mesma
         '''
 
         print('Iniciando conexao TCP com o cliente', self.clients[cliente_tcp[0]])
-        buffer = None #buffer do arquivo
-        f = open("arquivos/{}".format(file_name),"w+")
-        while True:
-            arq = conn.recv(1024).decode()
-            buffer += arq
-        
-        f.write(buffer)
-            
+        with open(file_name,"wb") as f:
+            while True:
+                arq = conn.recv(2048)
+                if('BYE'.encode() in arq):
+                    break
+
+                f.write(arq)
 
         print('Finalizando conexao TCP do cliente', self.clients[cliente_tcp[0]])
         conn.close()
+        message_to_resend = "INFO:Usuário {} disponibilizou o arquivo {} no servidor\
+                                ".format(self.clients[cliente_tcp[0]][0],file_name)
+        self.broadcast(message_to_resend, cliente_tcp[0], port = self.port)
         return
 
-    def create_tcp_thread(self, file_name = ''):
+    def create_tcp_thread_receive(self, file_name = ''):
         '''
         Função definida para aceitar a conexão e criar uma thread para a mesma
         '''
 
         conn, cliente_tcp = self.tcp.accept()
-        tcp_thread = threading.Thread(target=self.create_tcp_conn, args=(conn, cliente_tcp, file_name))
-        tcp_thread.start()
+        tcp_thread_receive = threading.Thread(target=self.create_tcp_conn_receive, args=(conn, cliente_tcp, file_name))
+        tcp_thread_receive.start()
+
+    def create_tcp_conn_send(self, host, port=20000, file_name = ''):
+
+            tcp_send = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+            with open(file_name, "rb") as f:
+                # Lê 32 bytes de um arquivo
+                data = f.read(32)
+
+                #Conecta com o cliente
+                tcp_send.connect( (host, port) )
+
+                # Enquanto o dado pego do arquivo não for vazio envia o dado e pega mais 32 bytes
+                while data != b'':
+                    tcp_send.send(data)
+                    data = f.read(32)
+
+            # Envio terminado, envia um BYE para simbolizar
+            tcp_send.send('BYE'.encode())
+
+            # Fecha a conexão
+            tcp_send.close()
+
+    def create_tcp_thread_send(self, file_name, host, port=20000):
+        '''
+        Função definida para aceitar a conexão e criar uma thread para a mesma
+        '''
+        tcp_thread_send = threading.Thread(target=self.create_tcp_conn_send, args=(host, port, file_name))
+        tcp_thread_send.start()
 
     
     def keep_sender(self):
