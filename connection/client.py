@@ -21,14 +21,16 @@ class Client:
     def udp_receive(self, u):
         while True:
             message, client = u.recvfrom(1024)
-            print(client, ": ", message.decode())
+            print(message.decode())
         u.close()
 
-    def udp_send(self, u):
+    def udp_send(self, u, target=None):
+        if target is None:
+            target = self._host_info
         message = "USER:" + self._username
         while message != '/bye':
-            u.sendto(message.encode(), self._host_info)
-            message = input()
+            u.sendto(message.encode(), target)
+            message = "MSG:" + input()
         u.close()
 
     def tcp(self):
