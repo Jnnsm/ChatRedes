@@ -20,7 +20,7 @@ def main():
         try:
             if args.username is None:
                 args.username = input("Nome de usuário: ")
-            conn = client.Client(args.username, args.host, port=20001)
+            conn = client.Client(args.username, args.host, port=20000)
         except Exception as exception:
             print("Argumentos faltando ou porta ocupada!")
             return

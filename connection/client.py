@@ -20,7 +20,6 @@ class Client:
 
         self._t = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._t.bind(('', port))
-        self._t.listen(1)
 
         # Variável que define se o usuário recebeu ou não um ack do servidor
         self.received_ack = False
@@ -91,13 +90,13 @@ class Client:
                 # de estabelecer uma conexão tcp para essa transferencia
                 elif '/get' in message:
                     self.udp_send('GET' + message[4:])
-                    thread_tcp_receive = threading.Thread(target=self.tcp_receive, args=message[4:])
+                    thread_tcp_receive = threading.Thread(target=self.tcp_receive, args=(message[5:],))
                     thread_tcp_receive.start()
                 # Caso seja a inserção de um arquivo envia a palavra FILE e o nome do arquivo, além de estabelecer uma
                 # conexão tcp para essa transferencia
                 elif '/file' in message:
                     self.udp_send('FILE' + message[5:])
-                    thread_tcp_send = threading.Thread(target=self.tcp_send, args=message[5:])
+                    thread_tcp_send = threading.Thread(target=self.tcp_send, args=(message[6:],))
                     thread_tcp_send.start()
             else:
                 message = "MSG:" + message
@@ -118,32 +117,55 @@ class Client:
             target = self._host_info
         try:
             self._u.sendto(message.encode(), target)
-        except Exception as excepton:
-            return
+        except Exception as exception:
+            print(exception)
 
     def tcp_receive(self, filename):
-        data = ""
+        print("Recebendo arquivo " + filename)
+        # Faz as redefinições do TCP
+        self._t = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._t.bind(('', self._host_info[1]))
+        self._t.listen(1)
         try:
+            # Abre arquivo para escrita binária
+            file = open(filename, "wb")
+            # Aceita a conexão com o sender
             connection, sender = self._t.accept()
             while True:
-                message = connection.recv(1024).decode()
-                if message == 'BYE':
+                # Recebe uma mensagem e logo em seguida escreve ela no arquivo caso não seja um BYE
+                message = connection.recv(1024)
+                if 'BYE'.encode() in message:
                     break
-                data += message
+                file.write(message)
+            # Fecha as conexões e o arquivo
             connection.close()
-            file = open(filename, "w")
-            file.write(data)
+            self._t.close()
             file.close()
-        except Exception as ex:
-            return
+        except Exception as exception:
+            print(exception)
+        print("Arquivo recebido")
 
     def tcp_send(self, filename):
-        self._t.connect(self._host_info)
-        file = open(filename, "r")
+        print("Enviando arquivo " + filename)
+        # Redefine o socket de tcp
+        self._t = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            # Testa conexão com o host
+            self._t.connect(self._host_info)
+            # Abre arquivo escolhido
+            file = open(filename, "rb")
+            # Lê 32 bytes de um arquivo
+            data = file.read(32)
+            # Enquanto o dado pego do arquivo não for vazio envia o dado e pega mais 32 bytes
+            while data != b'':
+                self._t.send(data)
+                data = file.read(32)
+            # Envio terminado, envia um BYE para simbolizar
+            self._t.send('BYE'.encode())
+            # Fecha o arquivo e a conexão
+            file.close()
+            self._t.close()
+        except Exception as exception:
+            print(exception)
 
-        data = file.read(32)
-        while data != "":
-            self._t.send(data.encode())
-        self._t.send('BYE'.encode())
-
-        file.close()
+        print("Arquivo enviado")
