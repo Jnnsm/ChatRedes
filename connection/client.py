@@ -65,6 +65,9 @@ class Client:
                 elif "INFO:" in message:
                     print(message[6:])
                 # Mostra a mensagem recebida pelo usuário
+                elif message.split(':')[0] == "MSG":
+                    message = message.split(':')[1] + " disse: " + message.split(':')[2]
+                    print(message)
                 else:
                     print(message)
             except Exception as exception:
@@ -79,7 +82,7 @@ class Client:
         while True:
             # Recebe uma mensagem de entrada e caso não seja /bye ele envia para o servidor
             message = input()
-            if message[0] == '/':
+            if len(message) > 0 and message[0] == '/':
                 # Caso seja uma mensagem de finalização saimos do loop
                 if message == '/bye':
                     break
@@ -98,7 +101,7 @@ class Client:
                     self.udp_send('FILE' + message[5:])
                     thread_tcp_send = threading.Thread(target=self.tcp_send, args=(message[6:],))
                     thread_tcp_send.start()
-            else:
+            elif len(message) > 0:
                 message = "MSG:" + message
                 self.udp_send(message)
 
