@@ -18,9 +18,11 @@ def main():
         conn = server.Server()
     elif args.type == "C" or args.type == "c":
         try:
-            conn = client.Client(args.username, args.host)
+            if args.username is None:
+                args.username = input("Nome de usuário: ")
+            conn = client.Client(args.username, args.host, port=20001)
         except Exception as exception:
-            print("Argumentos faltando ou servidor offline!")
+            print("Argumentos faltando ou porta ocupada!")
             return
 
 
