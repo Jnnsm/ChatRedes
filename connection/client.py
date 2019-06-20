@@ -54,12 +54,11 @@ class Client:
                 message = message.decode()
                 # Caso a mensagem recebida seja um 'KEEP' responderemos
                 if message == 'KEEP':
-                    print(message)
                     self.udp_send(u, 'KEEP')
                 elif message == 'ACK':
                     self.received_ack = True
+                # Mostra a mensagem recebida pelo usuário
                 else:
-                    # Mostra a mensagem recebida pelo usuário
                     print(message)
             except Exception as exception:
                 break
