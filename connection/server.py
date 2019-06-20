@@ -5,31 +5,31 @@ import socket
 class Server:
     udp = None
     clients = {}
-
     def __init__(self, host='', port=2000):
-        udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         origem = (host, port)
-        udp.bind(origem)
+        self.udp.bind(origem)
 
-        self.list_udp()
-
+        self.listen_udp()
+    
     def listen_udp(self):
         while True:
             msg, cliente = self.udp.recvfrom(1024)
-
+            
             print(cliente, msg.decode())
-            if (cliente[0] in cliente):
+            if(cliente[0] in cliente):
                 self.send_msg(msg, cliente[0])
             else:
                 msg_decode = msg.decode()
                 split_msg = msg_decode.split(':')
-                # Adiciona na lista de clientes
-                if (split_msg[0] == "USER"):
+                #Adiciona na lista de clientes
+                if(split_msg[0] == "USER"):
                     self.clients["split_msg[1]"] = cliente
-                    print(self.clients)
+                    print (self.clients)
+
+            
 
     def send_msg(self, message, host, port=2000):
         udp_msg = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         destino = (host, port)
-        udp_msg.bind(destino)
-        udp_msg.sendto(message, udp_msg)
+        udp_msg.sendto(message, destino)
