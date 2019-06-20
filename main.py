@@ -20,7 +20,7 @@ def main():
         try:
             conn = client.Client(args.username, args.host)
         except Exception as exception:
-            print("Argumentos devem ser passados para conexão com o servidor!")
+            print("Argumentos faltando ou servidor offline!")
             return
 
 
