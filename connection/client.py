@@ -1,6 +1,7 @@
 import threading
 import socket
 import time
+import select
 
 
 class Client:
@@ -26,6 +27,7 @@ class Client:
 
         # Define a thread para receber mensagens
         thread_receive = threading.Thread(target=self.udp_receive)
+        # thread_receive.setDaemon(True)
         thread_receive.start()
 
         # Define a primeira mensagem para o servidor é USER: + username
@@ -44,10 +46,8 @@ class Client:
 
         # Define a thread para entrar no chat
         thread_send = threading.Thread(target=self.chat)
+        # thread_send.setDaemon(True)
         thread_send.start()
-
-        thread_send.join()
-        thread_receive.join()
 
     """
     Função definida para receber mensagens na porta definida em __init__ e responder caso seja necessário
@@ -56,23 +56,25 @@ class Client:
     def udp_receive(self):
         while True:
             try:
-                message, client = self._u.recvfrom(1024)
-                message = message.decode()
-                # Caso a mensagem recebida seja um 'KEEP' responderemos
-                if message == 'KEEP':
-                    self.udp_send('KEEP')
-                # Caso recebemos um ack, confirmamos por meio da variável booleana global received_ack
-                elif message == 'ACK':
-                    self.received_ack = True
-                # Caso recebemos um info mostramos o conteúdo da informação na tela
-                elif "INFO:" in message:
-                    print(message[6:])
-                # Mostra a mensagem recebida pelo usuário
-                elif message.split(':')[0] == "MSG":
-                    message = message.split(':')[1] + " disse: " + message.split(':')[2]
-                    print(message)
-                else:
-                    print(message)
+                # Checa se a conexão não foi fechada com um timeout de 1 segundo
+                if select.select([self._u], [], [], 1)[0]:
+                    message, client = self._u.recvfrom(1024)
+                    message = message.decode()
+                    # Caso a mensagem recebida seja um 'KEEP' responderemos
+                    if message == 'KEEP':
+                        self.udp_send('KEEP')
+                    # Caso recebemos um ack, confirmamos por meio da variável booleana global received_ack
+                    elif message == 'ACK':
+                        self.received_ack = True
+                    # Caso recebemos um info mostramos o conteúdo da informação na tela
+                    elif "INFO:" in message:
+                        print(message[5:])
+                    # Mostra a mensagem recebida pelo usuário
+                    elif message.split(':')[0] == "MSG":
+                        message = message.split(':')[1] + " disse: " + message.split(':')[2]
+                        print(message)
+                    else:
+                        print(message)
             except Exception as exception:
                 break
         self._u.close()
@@ -97,12 +99,14 @@ class Client:
                 elif '/get' in message:
                     self.udp_send('GET' + message[4:])
                     thread_tcp_receive = threading.Thread(target=self.tcp_receive, args=(message[5:],))
+                    thread_tcp_receive.setDaemon(True)
                     thread_tcp_receive.start()
                 # Caso seja a inserção de um arquivo envia a palavra FILE e o nome do arquivo, além de estabelecer uma
                 # conexão tcp para essa transferencia
                 elif '/file' in message:
                     self.udp_send('FILE' + message[5:])
                     thread_tcp_send = threading.Thread(target=self.tcp_send, args=(message[6:],))
+                    thread_tcp_send.setDaemon(True)
                     thread_tcp_send.start()
             elif len(message) > 0:
                 message = "MSG:" + message
@@ -117,14 +121,13 @@ class Client:
     """
 
     def udp_send(self, message, target=None):
-
         # Se não tiver um target especifico mandar para o servidor
         if target is None:
             target = self._host_info
         try:
             self._u.sendto(message.encode(), target)
         except Exception as exception:
-            print(exception)
+            return
 
     def tcp_receive(self, filename):
         print("Recebendo arquivo " + filename)
@@ -148,7 +151,7 @@ class Client:
             self._t.close()
             file.close()
         except Exception as exception:
-            print(exception)
+            return
         print("Arquivo recebido")
 
     def tcp_send(self, filename):
@@ -172,6 +175,6 @@ class Client:
             file.close()
             self._t.close()
         except Exception as exception:
-            print(exception)
+            return
 
         print("Arquivo enviado")
