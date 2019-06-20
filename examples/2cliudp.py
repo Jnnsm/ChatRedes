@@ -1,6 +1,6 @@
 import socket
-HOST = '127.0.1.1'  # Endereco IP do Servidor
-PORT = 5000            # Porta que o Servidor esta
+HOST = '192.168.2.200'  # Endereco IP do Servidor
+PORT = 20000            # Porta que o Servidor esta
 udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 dest = (HOST, PORT)
 print('Para sair digite bye')
