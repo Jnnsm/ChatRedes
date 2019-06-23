@@ -2,9 +2,9 @@ import threading
 import socket
 import time
 import select
+import os
 
-import sys
-sys.path.insert(0,'/arquivos')
+
 
 
 class Server:
@@ -95,7 +95,7 @@ class Server:
                 self.create_tcp_thread_receive(msg_decode[5:])
 
             elif( 'GET' == msg_decode[0:3] ): #Envia um arquivo
-                self.create_tcp_thread_send(msg_decode[3:], cliente[0], self.port)
+                self.create_tcp_thread_send(msg_decode[4:], cliente[0], self.port)
 
             elif('MSG' == msg_decode[0:3] and cliente[0] in self.clients): #Faz um broadcast da mensagem enviada
                 message_to_resend = "MSG:{}:{}".format(self.clients[cliente[0]][0],msg_decode[4:])
@@ -122,10 +122,12 @@ class Server:
         '''
 
         print('Iniciando conexao TCP com o cliente', self.clients[cliente_tcp[0]])
-        with open(file_name,"wb") as f:
+        with open(os.path.join("files/", file_name),"wb+") as f:
             while True:
-                arq = conn.recv(2048)
+                arq = conn.recv(1024)
                 if('BYE'.encode() in arq):
+                    arq = arq.split('BYE'.encode())
+                    f.write(arq[0])
                     break
 
                 f.write(arq)
@@ -154,7 +156,7 @@ class Server:
 
         tcp_send = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-        with open(file_name, "rb") as f:
+        with open(os.path.join("files/", file_name), "rb") as f:
             # Lê 32 bytes de um arquivo
             data = f.read(32)
 
