@@ -13,6 +13,8 @@ class Client:
         self._username = username
         self._host_info = (host_address, port)
 
+        self._files_dir = "files/"
+
         # É criado um socket único para caso a conexão seja fechada para escrita ela também será fechada para ouvir e o
         # programa se encerrará
 
@@ -137,13 +139,15 @@ class Client:
         self._t.listen(1)
         try:
             # Abre arquivo para escrita binária
-            file = open(filename, "wb")
+            file = open(self._files_dir + filename, "wb+")
             # Aceita a conexão com o sender
             connection, sender = self._t.accept()
             while True:
                 # Recebe uma mensagem e logo em seguida escreve ela no arquivo caso não seja um BYE
                 message = connection.recv(1024)
                 if 'BYE'.encode() in message:
+                    message = message.split('BYE'.encode())
+                    file.write(message[0])
                     break
                 file.write(message)
             # Fecha as conexões e o arquivo
@@ -151,6 +155,7 @@ class Client:
             self._t.close()
             file.close()
         except Exception as exception:
+            print(exception)
             return
         print("Arquivo recebido")
 
@@ -162,19 +167,20 @@ class Client:
             # Testa conexão com o host
             self._t.connect(self._host_info)
             # Abre arquivo escolhido
-            file = open(filename, "rb")
+            file = open(self._files_dir + filename, "rb+")
             # Lê 32 bytes de um arquivo
-            data = file.read(32)
+            data = file.read(256)
             # Enquanto o dado pego do arquivo não for vazio envia o dado e pega mais 32 bytes
             while data != b'':
                 self._t.send(data)
-                data = file.read(32)
+                data = file.read(256)
             # Envio terminado, envia um BYE para simbolizar
             self._t.send('BYE'.encode())
             # Fecha o arquivo e a conexão
             file.close()
             self._t.close()
         except Exception as exception:
+            print(exception)
             return
 
         print("Arquivo enviado")
